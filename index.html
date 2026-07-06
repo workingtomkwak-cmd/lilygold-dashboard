@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>릴리골드 제주점 대시보드</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--ink:#1a1d23;--sub:#6b7280;--gold:#b8963e;--gold2:#d4b866;--line:#e5e7eb;--red:#dc2626;--green:#059669}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;background:var(--bg);color:var(--ink);padding:28px}
+.wrap{max-width:1200px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:22px;flex-wrap:wrap;gap:8px}
+h1{font-size:22px;font-weight:700}
+h1 span{color:var(--gold)}
+.gen{color:var(--sub);font-size:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:22px}
+.kpi{background:var(--card);border-radius:14px;padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.kpi .l{font-size:12px;color:var(--sub);margin-bottom:6px}
+.kpi .v{font-size:22px;font-weight:700}
+.kpi .d{font-size:12px;margin-top:4px}
+.up{color:var(--green)}.down{color:var(--red)}
+.grid{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.card{background:var(--card);border-radius:14px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card h2{font-size:14px;font-weight:600;margin-bottom:14px;color:#374151}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--sub);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--line);font-size:12px}
+td{padding:7px 8px;border-bottom:1px solid #f1f2f4}
+td.r,th.r{text-align:right}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;background:#f3f0e7;color:var(--gold)}
+.warn{background:#fee2e2;color:var(--red)}
+canvas{max-height:280px}
+.empty{color:var(--sub);font-size:13px;padding:12px 0}
+@media(max-width:820px){.grid,.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>LILY <span>GOLD</span> · 제주점 매출/재고 대시보드</h1>
+  <div class="gen">생성: <span id="gen"></span> · 기준월: <span id="cm"></span>월</div>
+</header>
+
+<div class="kpis">
+  <div class="kpi"><div class="l">이번 달 판매</div><div class="v" id="k1"></div><div class="d" id="k1d"></div></div>
+  <div class="kpi"><div class="l">이번 달 매출</div><div class="v" id="k2"></div><div class="d" id="k2d"></div></div>
+  <div class="kpi"><div class="l">정산 예정액 (95%)</div><div class="v" id="k3"></div><div class="d">수수료 5% 차감</div></div>
+  <div class="kpi"><div class="l">연간 누적 매출</div><div class="v" id="k4"></div><div class="d" id="k4d"></div></div>
+  <div class="kpi"><div class="l">판매 가능 재고</div><div class="v" id="k5"></div><div class="d" id="k5d"></div></div>
+</div>
+
+<div class="grid">
+  <div class="card"><h2>월별 매출 추이</h2><canvas id="trend"></canvas></div>
+  <div class="card"><h2>카테고리별 매출 (연간)</h2><canvas id="donut"></canvas></div>
+</div>
+
+<div class="grid2">
+  <div class="card"><h2 id="curTitle"></h2>
+    <table id="curTable"><thead><tr><th>품번</th><th>Type</th><th class="r">수량</th><th class="r">금액</th></tr></thead><tbody></tbody></table>
+  </div>
+  <div class="card"><h2>베스트셀러 TOP 10 (연간)</h2>
+    <table id="topTable"><thead><tr><th>#</th><th>품번</th><th>Type</th><th class="r">수량</th><th class="r">금액</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<div class="card"><h2>품절 품목 (판매 재고 0)</h2>
+  <div id="soldout"></div>
+</div>
+</div>
+
+<script>
+const D = {"gen": "2026-07-06 17:54", "curMonth": 6, "months": [1, 2, 3, 4, 5, 6], "monthlyQty": [12, 12, 15, 14, 11, 7], "monthlyAmt": [726400, 1085000, 1089000, 1111600, 872200, 683600], "curQty": 7, "curAmt": 683600, "growth": -21.6, "ytdAmt": 5567800, "ytdQty": 71, "settle": 649420, "typeAmt": {"Earring": 2653300.0, "Necklace": 1154600.0, "Ring": 263900.0, "Bracelet": 1496000.0}, "typeQty": {"Earring": 44, "Necklace": 12, "Ring": 4, "Bracelet": 11}, "top": [{"item": "LG24A016", "type": "Earring", "qty": 4, "amt": 236000}, {"item": "LG24A072", "type": "Bracelet", "qty": 3, "amt": 351000}, {"item": "LG24A012", "type": "Earring", "qty": 3, "amt": 177000}, {"item": "LG24A017", "type": "Earring", "qty": 3, "amt": 173000}, {"item": "LG24A101", "type": "Earring", "qty": 3, "amt": 165000}, {"item": "LG24A108", "type": "Bracelet", "qty": 2, "amt": 290000}, {"item": "LG24A110", "type": "Bracelet", "qty": 2, "amt": 290000}, {"item": "LG24A042", "type": "Necklace", "qty": 2, "amt": 225000}, {"item": "LG24A098", "type": "Earring", "qty": 2, "amt": 189000}, {"item": "LG24A111", "type": "Necklace", "qty": 2, "amt": 178000}], "curSales": [{"item": "LG24A108", "type": "Bracelet", "qty": 1, "amt": 145000.0}, {"item": "LG24A109", "type": "Bracelet", "qty": 1, "amt": 145000.0}, {"item": "LG24A072", "type": "Bracelet", "qty": 1, "amt": 130000.0}, {"item": "LG24A042", "type": "Necklace", "qty": 1, "amt": 100000.0}, {"item": "LG24A006", "type": "Earring", "qty": 1, "amt": 55000.0}, {"item": "LG24A101", "type": "Earring", "qty": 1, "amt": 55000.0}, {"item": "LG24A039", "type": "Earring", "qty": 1, "amt": 53600.0}], "totalDp": 87.0, "totalSale": 130.0, "soldout": [{"item": "LG24A006", "type": "Earring", "price": 55000}, {"item": "LG24A039", "type": "Earring", "price": 67000}, {"item": "LG24A071", "type": "Earring", "price": 75000}, {"item": "LG24A072", "type": "Bracelet", "price": 130000}, {"item": "LG24A075", "type": "Ring", "price": 57000}, {"item": "LG24A077", "type": "Ring", "price": 78000}, {"item": "LG24A083", "type": "Necklace", "price": 77000}, {"item": "LG24A092", "type": "Earring", "price": 59000}, {"item": "LG24A108", "type": "Bracelet", "price": 145000}, {"item": "LG24A109", "type": "Bracelet", "price": 145000}, {"item": "LG24A106", "type": "Earring", "price": 63000}, {"item": "LG24A110", "type": "Bracelet", "price": 145000}, {"item": "LG24A111", "type": "Necklace", "price": 89000}], "invType": {"Earring": 79.0, "Between": 10.0, "Necklace": 20.0, "Ring": 17.0, "Bracelet": 4.0}};
+const won = n => n.toLocaleString('ko-KR') + '원';
+document.getElementById('gen').textContent = D.gen;
+document.getElementById('cm').textContent = D.curMonth;
+document.getElementById('k1').textContent = D.curQty + '점';
+document.getElementById('k2').textContent = won(D.curAmt);
+const g = D.growth;
+document.getElementById('k2d').innerHTML = '전월 대비 <span class="'+(g>=0?'up':'down')+'">'+(g>=0?'▲ ':'▼ ')+Math.abs(g)+'%</span>';
+document.getElementById('k1d').textContent = '연간 누적 ' + D.ytdQty + '점';
+document.getElementById('k3').textContent = won(D.settle);
+document.getElementById('k4').textContent = won(D.ytdAmt);
+document.getElementById('k4d').textContent = '월평균 ' + won(Math.round(D.ytdAmt / D.months.filter((m,i)=>D.monthlyAmt[i]>0).length));
+document.getElementById('k5').textContent = D.totalSale + '점';
+document.getElementById('k5d').textContent = '디피 ' + D.totalDp + '점 · 품절 ' + D.soldout.length + '종';
+document.getElementById('curTitle').textContent = D.curMonth + '월 판매 내역';
+
+new Chart(document.getElementById('trend'), {
+  data: {
+    labels: D.months.map(m => m + '월'),
+    datasets: [
+      {type:'bar', label:'매출액', data:D.monthlyAmt, backgroundColor:'#d4b866', borderRadius:6, yAxisID:'y'},
+      {type:'line', label:'판매수량', data:D.monthlyQty, borderColor:'#1a1d23', backgroundColor:'#1a1d23', tension:.3, yAxisID:'y2'}
+    ]
+  },
+  options: {
+    plugins:{legend:{labels:{font:{size:11}}}},
+    scales:{
+      y:{ticks:{callback:v=>(v/10000)+'만', font:{size:11}}},
+      y2:{position:'right', grid:{drawOnChartArea:false}, ticks:{font:{size:11}}}
+    }
+  }
+});
+const tl = Object.keys(D.typeAmt);
+new Chart(document.getElementById('donut'), {
+  type:'doughnut',
+  data:{labels:tl, datasets:[{data:tl.map(t=>Math.round(D.typeAmt[t])), backgroundColor:['#b8963e','#1a1d23','#9ca3af','#d4b866','#6b7280']}]},
+  options:{plugins:{legend:{position:'bottom', labels:{font:{size:11}}},
+    tooltip:{callbacks:{label:c=>c.label+': '+won(c.parsed)+' ('+D.typeQty[c.label]+'점)'}}}}
+});
+const ct = document.querySelector('#curTable tbody');
+if (D.curSales.length === 0) ct.innerHTML = '<tr><td colspan="4" class="empty">판매 내역 없음</td></tr>';
+D.curSales.forEach(s => ct.insertAdjacentHTML('beforeend',
+  `<tr><td>${s.item}</td><td><span class="badge">${s.type}</span></td><td class="r">${s.qty}</td><td class="r">${won(Math.round(s.amt))}</td></tr>`));
+const tt = document.querySelector('#topTable tbody');
+D.top.forEach((s,i) => tt.insertAdjacentHTML('beforeend',
+  `<tr><td>${i+1}</td><td>${s.item}</td><td><span class="badge">${s.type}</span></td><td class="r">${s.qty}</td><td class="r">${won(s.amt)}</td></tr>`));
+const so = document.getElementById('soldout');
+if (D.soldout.length === 0) so.innerHTML = '<div class="empty">품절 품목 없음</div>';
+else so.innerHTML = D.soldout.map(s=>`<span class="badge warn" style="margin:3px">${s.item} · ${s.type}</span>`).join(' ');
+</script>
+</body>
+</html>
